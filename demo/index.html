@@ -88,6 +88,14 @@
       console.log('added to cart', b.dataset.sku);
     });
   });
+  // Delegated handler so cards added later also work.
+  document.querySelector('.grid').addEventListener('click', function (e) {
+    var b = e.target.closest('.add-to-cart');
+    if (!b) return;
+    cart++; document.getElementById('cart-count').textContent = cart;
+    Requestor.setContext({ cartItems: cart });
+    console.log('added to cart', b.dataset.sku);
+  });
   document.getElementById('shop-now').addEventListener('click', function () { location.hash = 'beans'; });
   document.getElementById('subscribe-form').addEventListener('submit', function (e) {
     e.preventDefault();
