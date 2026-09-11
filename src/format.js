@@ -97,10 +97,32 @@ export function buildAgentPrompt(report, { publicBaseUrl } = {}) {
     'Goal: find the root cause, fix it, add or update a test where reasonable, and open a pull request.',
     'In the PR description, reference the Linear issue and summarize the cause and the fix.',
     'If the report is not reproducible or not actionable from the code, do not open a PR; explain why instead.',
+    `Include this exact line in the PR description so the report can be linked back: Requestor-Report: ${report.id}`,
     '',
     '--- Bug report ---',
     `Title: ${report.title}`,
     '',
   ].filter((l) => l !== null);
   return head.join('\n') + buildIssueDescription(report, { publicBaseUrl });
+}
+
+// Feedback text for a failed CI run: which jobs and steps failed, plus the log tail.
+const LOG_TAIL_LINES = 60;
+const LOG_MAX_CHARS = 5000;
+function logTail(log) {
+  if (!log) return null;
+  const lines = String(log).split(/\r?\n/).map((l) => l.replace(/^\S+Z\s/, '')).filter((l) => l.trim());
+  const tail = lines.slice(-LOG_TAIL_LINES).join('\n');
+  return tail.length > LOG_MAX_CHARS ? tail.slice(-LOG_MAX_CHARS) : tail;
+}
+export function formatCiFailure({ run, jobs = [] }) {
+  const parts = [`CI failed on this pull request: ${run.html_url}`];
+  if (!jobs.length) parts.push('The failing jobs and logs could not be retrieved; open the run link above.');
+  for (const job of jobs) {
+    parts.push('', `Failed job: ${job.name}${job.steps?.length ? ` (step: ${job.steps.join(', ')})` : ''}${job.url ? ` ${job.url}` : ''}`);
+    const tail = logTail(job.log);
+    if (tail) parts.push(fence(tail));
+  }
+  parts.push('', 'Please fix the failure and push to this branch. Keep the change scoped to what CI reports; do not disable or delete tests to make it pass.');
+  return parts.join('\n');
 }

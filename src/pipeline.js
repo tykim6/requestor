@@ -1,6 +1,7 @@
 // The report pipeline. Each stage logs an event so the full history of a
-// report is reconstructable from the events table. Adding a stage (e.g. an
-// agentic triage/fix step) means appending another step after syncToLinear.
+// report is reconstructable from the events table.
+//   submit -> store -> syncToLinear -> (auto) dispatchAgent
+//   sendFeedback: a further turn to the agent (manual, or from the review loop in review.js)
 
 import { randomUUID } from 'node:crypto';
 import { buildAgentPrompt, buildIssueDescription, buildIssueTitle, severityToPriority } from './format.js';
@@ -52,14 +53,12 @@ export function createPipeline({ db, linear, agent = null, autoDispatch = false,
     return db.getReport(reportId);
   }
 
-  // Close the loop on the Linear issue so whoever is watching it sees where the work went.
-  // Best-effort: a failed comment never fails the dispatch. Delegation already shows up in Linear itself.
-  async function noteDispatchOnIssue(report, backend, result) {
-    if (!linear || !report.linear_issue_id || backend === 'linear-delegate') return;
-    const body = `Handed to coding agent **${backend}**${result.url ? `: ${result.url}` : ''}\n\n_Posted by Requestor._`;
+  // Best-effort note on the Linear issue so whoever watches it sees where the work went.
+  async function noteOnIssue(report, body, eventType = 'linear.commented') {
+    if (!linear || !report.linear_issue_id) return;
     try {
-      const comment = await linear.createComment(report.linear_issue_id, body);
-      db.addEvent(report.id, 'linear.commented', { commentId: comment.id, url: comment.url });
+      const comment = await linear.createComment(report.linear_issue_id, `${body}\n\n_Posted by Requestor._`);
+      db.addEvent(report.id, eventType, { commentId: comment.id, url: comment.url });
     } catch (err) {
       db.addEvent(report.id, 'linear.comment_failed', { error: err.message });
       console.error(`[requestor] Linear comment failed for ${report.id}: ${err.message}`);
@@ -78,12 +77,31 @@ export function createPipeline({ db, linear, agent = null, autoDispatch = false,
     try {
       const result = await agent.dispatch({ report, prompt });
       db.markAgentDispatched(reportId, agent.name, result);
-      db.addEvent(reportId, 'agent.dispatched', { backend: agent.name, ref: result.ref, url: result.url, raw: result.raw ?? null });
-      await noteDispatchOnIssue(report, agent.name, result);
+      db.addEvent(reportId, 'agent.dispatched', { backend: agent.name, ref: result.ref, url: result.url, branch: result.branch ?? null, raw: result.raw ?? null });
+      if (agent.name !== 'linear-delegate') await noteOnIssue(report, `Handed to coding agent **${agent.name}**${result.url ? `: ${result.url}` : ''}`);
     } catch (err) {
       db.markAgentFailed(reportId, agent.name, err.message);
       db.addEvent(reportId, 'agent.failed', { backend: agent.name, error: err.message });
       console.error(`[requestor] agent dispatch failed for ${reportId}: ${err.message}`);
+    }
+    return db.getReport(reportId);
+  }
+
+  // One more turn for the agent. `source` is 'manual' | 'ci' | 'review'. Throws on failure so callers can surface it.
+  async function sendFeedback(reportId, text, { source = 'manual' } = {}) {
+    const report = db.getReport(reportId);
+    if (!report) throw new Error(`report ${reportId} not found`);
+    if (!agent) throw new Error('AGENT_BACKEND not configured');
+    if (!agent.feedback) throw new Error(`${agent.name} backend does not support feedback`);
+    if (report.agent_status !== 'dispatched') throw new Error('report has not been dispatched to an agent');
+    try {
+      const result = await agent.feedback({ report, text });
+      if (result.prNumber && !report.pr_number) db.setPullRequest(reportId, result.prNumber, report.pr_url);
+      const rounds = db.incrementFeedbackRounds(reportId);
+      db.addEvent(reportId, 'feedback.sent', { source, backend: agent.name, round: rounds, ref: result.ref, url: result.url, text: text.slice(0, 4000) });
+    } catch (err) {
+      db.addEvent(reportId, 'feedback.failed', { source, backend: agent.name, error: err.message });
+      throw err;
     }
     return db.getReport(reportId);
   }
@@ -97,5 +115,7 @@ export function createPipeline({ db, linear, agent = null, autoDispatch = false,
     },
     retrySync: syncToLinear,
     dispatchAgent,
+    sendFeedback,
+    noteOnIssue,
   };
 }

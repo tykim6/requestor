@@ -21,12 +21,18 @@ export const config = {
     teamId: env('LINEAR_TEAM_ID'),
     labels: env('LINEAR_LABELS').split(',').map((s) => s.trim()).filter(Boolean),
   },
+  github: {
+    token: env('GITHUB_TOKEN'),
+    repo: env('GITHUB_REPO'),
+    webhookSecret: env('GITHUB_WEBHOOK_SECRET'),
+    autoApproveCi: env('GITHUB_AUTO_APPROVE_CI', 'false') === 'true',
+  },
   agent: {
     backend: env('AGENT_BACKEND', 'none'),
     autoDispatch: env('AGENT_AUTO_DISPATCH', 'false') === 'true',
+    autoCiFeedback: env('AGENT_AUTO_CI_FEEDBACK', 'true') === 'true',
+    maxRounds: Number(env('AGENT_MAX_ROUNDS', '2')),
     copilot: {
-      token: env('GITHUB_TOKEN'),
-      repo: env('GITHUB_REPO'),
       baseRef: env('GITHUB_BASE_REF', 'main'),
       model: env('COPILOT_MODEL'),
     },
