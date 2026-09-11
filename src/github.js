@@ -47,7 +47,5 @@ export function createGitHubClient({ token, repo, apiUrl = 'https://api.github.c
       return res.text();
     },
 
-    /** Runs on PRs from first-time contributors (Copilot included) wait for approval. */
-    approveWorkflowRun: (runId) => request('POST', `/repos/${repo}/actions/runs/${runId}/approve`),
   };
 }

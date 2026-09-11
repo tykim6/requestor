@@ -47,7 +47,7 @@ const ADDED_COLUMNS = [
   ['agent_backend', 'TEXT'], ['agent_status', 'TEXT'], ['agent_ref', 'TEXT'], ['agent_url', 'TEXT'], ['agent_error', 'TEXT'],
   // review loop: the PR the agent opened, CI outcome, feedback rounds spent
   ['agent_branch', 'TEXT'], ['pr_number', 'INTEGER'], ['pr_url', 'TEXT'],
-  ['review_status', 'TEXT'], // pr_open | ci_failed | ci_passed | merged | closed | needs_human
+  ['review_status', 'TEXT'], // pr_open | ci_awaiting_approval | ci_failed | ci_passed | merged | closed | needs_human
   ['feedback_rounds', 'INTEGER NOT NULL DEFAULT 0'],
 ];
 function migrate(db) {

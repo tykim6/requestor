@@ -25,7 +25,7 @@ export const config = {
     token: env('GITHUB_TOKEN'),
     repo: env('GITHUB_REPO'),
     webhookSecret: env('GITHUB_WEBHOOK_SECRET'),
-    autoApproveCi: env('GITHUB_AUTO_APPROVE_CI', 'false') === 'true',
+    ciWorkflows: env('GITHUB_CI_WORKFLOWS').split(',').map((s) => s.trim()).filter(Boolean),
   },
   agent: {
     backend: env('AGENT_BACKEND', 'none'),

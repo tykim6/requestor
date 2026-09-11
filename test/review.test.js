@@ -28,7 +28,6 @@ function fakeGitHub() {
       if (/\/issues\/\d+\/comments$/.test(req.url)) return reply(201, { id: 9001, html_url: 'https://github.com/x/y/pull/7#issuecomment-9001' });
       if (/\/actions\/runs\/\d+\/jobs/.test(req.url)) return reply(200, { jobs: [{ id: 501, name: 'test (22)', conclusion: 'failure', html_url: 'https://github.com/x/y/actions/runs/77/job/501', steps: [{ name: 'Run npm test', conclusion: 'failure' }] }, { id: 502, name: 'test (24)', conclusion: 'success', steps: [] }] });
       if (/\/actions\/jobs\/501\/logs/.test(req.url)) return reply(200, '2026-09-11T01:00:00.000Z line one\n2026-09-11T01:00:01.000Z ✖ demo add-to-cart increments once per click\n2026-09-11T01:00:02.000Z Error: ENOENT: no such file\n', 'text/plain');
-      if (/\/actions\/runs\/\d+\/approve/.test(req.url)) return reply(201, {});
       reply(404, { message: `unhandled ${req.method} ${req.url}` });
     });
   });
@@ -64,7 +63,7 @@ const prPayload = (id, action = 'opened', extra = {}) => ({
 });
 const runPayload = (conclusion, status = 'completed') => ({
   action: status === 'completed' ? 'completed' : 'requested',
-  workflow_run: { id: 77, name: 'test', html_url: 'https://github.com/x/y/actions/runs/77', status, conclusion, head_branch: 'copilot/fix-checkout', pull_requests: [{ number: 7 }] },
+  workflow_run: { id: 77, name: 'test', event: 'pull_request', html_url: 'https://github.com/x/y/actions/runs/77', status, conclusion, head_branch: 'copilot/fix-checkout', pull_requests: [{ number: 7 }] },
 });
 
 test('webhook rejects bad signatures and needs a secret', async () => {
@@ -141,6 +140,24 @@ test('CI success marks ci_passed; cancelled runs are recorded only', async () =>
   await t.close();
 });
 
+test("Copilot's own agent workflow runs never count as CI", async () => {
+  const t = await setup();
+  await deliver(t.base, 'pull_request', prPayload(t.id));
+  const agentRun = { ...runPayload('success'), workflow_run: { ...runPayload('success').workflow_run, id: 78, name: 'Addressing comment on PR #7', event: 'dynamic' } };
+  assert.equal((await json(await deliver(t.base, 'workflow_run', agentRun))).event, 'ignored.workflow');
+  assert.equal((await t.get()).review_status, 'pr_open');
+  await t.close();
+});
+
+test('CI can be restricted to named workflows', async () => {
+  const t = await setup({ ciWorkflows: ['test'] });
+  await deliver(t.base, 'pull_request', prPayload(t.id));
+  const other = { ...runPayload('failure'), workflow_run: { ...runPayload('failure').workflow_run, name: 'lint', event: 'pull_request' } };
+  assert.equal((await json(await deliver(t.base, 'workflow_run', other))).event, 'ignored.workflow');
+  assert.equal((await json(await deliver(t.base, 'workflow_run', { ...runPayload('failure'), workflow_run: { ...runPayload('failure').workflow_run, event: 'pull_request' } }))).event, 'feedback.sent');
+  await t.close();
+});
+
 test('feedback stops at the round cap and flags for a human', async () => {
   const t = await setup({ maxRounds: 1 });
   await deliver(t.base, 'pull_request', prPayload(t.id));
@@ -161,11 +178,12 @@ test('auto CI feedback can be turned off', async () => {
   await t.close();
 });
 
-test('runs awaiting approval are approved when enabled', async () => {
-  const t = await setup({ autoApproveCi: true });
+test('runs awaiting approval are recorded and flagged, not approved', async () => {
+  const t = await setup();
   await deliver(t.base, 'pull_request', prPayload(t.id));
-  assert.equal((await json(await deliver(t.base, 'workflow_run', runPayload('action_required')))).event, 'ci.approved');
-  assert.ok(t.gh.calls.some((c) => /\/actions\/runs\/77\/approve/.test(c.url)));
+  assert.equal((await json(await deliver(t.base, 'workflow_run', runPayload('action_required')))).event, 'ci.awaiting_approval');
+  assert.equal((await t.get()).review_status, 'ci_awaiting_approval');
+  assert.ok(!t.gh.calls.some((c) => /\/approve/.test(c.url)));
   await t.close();
 });
 

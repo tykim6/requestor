@@ -30,7 +30,7 @@ export function createApp(opts = {}) {
     db, pipeline, github,
     maxRounds: reviewOpts.maxRounds ?? cfg.agent.maxRounds,
     autoCiFeedback: reviewOpts.autoCiFeedback ?? cfg.agent.autoCiFeedback,
-    autoApproveCi: reviewOpts.autoApproveCi ?? cfg.github.autoApproveCi,
+    ciWorkflows: reviewOpts.ciWorkflows ?? cfg.github.ciWorkflows,
   });
   const webhookSecret = reviewOpts.webhookSecret ?? cfg.github.webhookSecret;
 

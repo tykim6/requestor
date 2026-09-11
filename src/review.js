@@ -13,7 +13,10 @@ const REPORT_MARKER = /Requestor-Report:\s*([0-9a-f-]{36})/i;
 const LINEAR_ID = /\b([A-Z][A-Z0-9]*-\d+)\b/;
 const OWN_COMMENT = '<!-- requestor -->';
 
-export function createReviewLoop({ db, pipeline, github, maxRounds = 2, autoCiFeedback = true, autoApproveCi = false }) {
+export function createReviewLoop({ db, pipeline, github, maxRounds = 2, autoCiFeedback = true, ciWorkflows = [] }) {
+  // Which workflow_run events count as "CI". Copilot's own agent sessions also run as workflows
+  // (event: dynamic, e.g. "Addressing comment on PR #1"); those must never count as a green build.
+  const isCiRun = (run) => run.event !== 'dynamic' && (ciWorkflows.length === 0 || ciWorkflows.includes(run.name));
   // Match a webhook to a report: by PR number, by branch, by the marker line the agent was asked
   // to put in the PR body, then by a Linear identifier in the branch name or text.
   function findReport({ prNumber, branch, text = '' } = {}) {
@@ -57,6 +60,7 @@ export function createReviewLoop({ db, pipeline, github, maxRounds = 2, autoCiFe
 
   async function onWorkflowRun(payload) {
     const run = payload.workflow_run;
+    if (!isCiRun(run)) return { event: 'ignored.workflow', name: run.name };
     const pr = run.pull_requests?.[0];
     const report = findReport({ prNumber: pr?.number, branch: run.head_branch });
     if (!report) return null;
@@ -65,17 +69,16 @@ export function createReviewLoop({ db, pipeline, github, maxRounds = 2, autoCiFe
     const info = { runId: run.id, name: run.name, url: run.html_url, conclusion: run.conclusion, head: run.head_branch };
     if (run.status !== 'completed') return { reportId: report.id, event: 'ignored' };
 
+    // GitHub holds Actions runs on Copilot's pushes until a maintainer clicks "Approve and run workflows",
+    // unless the repo setting (Settings > Copilot > cloud agent) skips approval. The approve REST endpoint
+    // only works for fork PRs, so there is nothing to automate here: record it and tell the issue.
     if (run.conclusion === 'action_required') {
       db.addEvent(report.id, 'ci.awaiting_approval', info);
-      if (!autoApproveCi) return { reportId: report.id, event: 'ci.awaiting_approval' };
-      try {
-        await github.approveWorkflowRun(run.id);
-        db.addEvent(report.id, 'ci.approved', info);
-        return { reportId: report.id, event: 'ci.approved' };
-      } catch (err) {
-        db.addEvent(report.id, 'ci.approve_failed', { ...info, error: err.message });
-        return { reportId: report.id, event: 'ci.approve_failed' };
+      if (report.review_status !== 'ci_awaiting_approval') {
+        db.setReviewStatus(report.id, 'ci_awaiting_approval');
+        await pipeline.noteOnIssue(report, `CI on the agent's PR is waiting for a maintainer to approve workflows: ${run.html_url}`);
       }
+      return { reportId: report.id, event: 'ci.awaiting_approval' };
     }
 
     db.addEvent(report.id, 'ci.completed', info);

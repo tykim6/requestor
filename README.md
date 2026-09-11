@@ -87,7 +87,7 @@ Dispatch is one-shot; the agents' APIs have no follow-up endpoint. The conversat
 4. Humans can add a turn any time: `POST /api/bugs/:id/feedback {"text": "..."}`.
 5. Merging stays manual. A merge is recorded as `pr.merged` and noted on the Linear issue.
 
-GitHub holds Actions runs on Copilot's PRs until a maintainer approves them; `GITHUB_AUTO_APPROVE_CI=true` approves runs for linked PRs automatically.
+GitHub holds Actions runs on Copilot's pushes until a maintainer clicks "Approve and run workflows" on the PR. Requestor records this as `ci_awaiting_approval` and notes it on the Linear issue; it cannot approve for you (the REST approve endpoint only covers fork PRs). To let the loop run unattended, turn on the repository setting under **Settings → Copilot → cloud agent** that skips workflow approval, and read GitHub's warning about it first. Copilot's own agent sessions also run as Actions workflows; those are never treated as CI. Use `GITHUB_CI_WORKFLOWS` to name the workflows that count.
 
 Not built yet: an LLM reviewer that judges a green PR against the original report before a human looks. The hook for it is the `ci.passed` event in `src/review.js`.
 
