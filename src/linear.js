@@ -91,6 +91,15 @@ export class LinearClient {
     return data.issueCreate.issue;
   }
 
+  async createComment(issueId, body) {
+    const data = await this.query(
+      `mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success comment { id url } } }`,
+      { input: { issueId, body } },
+    );
+    if (!data.commentCreate?.success) throw new Error('Linear commentCreate returned success=false');
+    return data.commentCreate.comment;
+  }
+
   /** e.g. updateIssue(id, { delegateId }) to hand the issue to an installed agent. */
   async updateIssue(id, input) {
     const data = await this.query(

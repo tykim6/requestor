@@ -128,6 +128,27 @@ test('linear-delegate backend sets delegateId on the created issue', async () =>
   await app.close(); lin.server.close();
 });
 
+test('dispatch posts a comment with the agent link on the Linear issue', async () => {
+  const lin = fakeServer(({ body }) => {
+    if (body.query.includes('teams')) return [200, { data: { teams: { nodes: [{ id: 'team_1', key: 'ENG', name: 'Eng' }] } } }];
+    if (body.query.includes('issueCreate')) return [200, { data: { issueCreate: { success: true, issue: { id: 'iss_1', identifier: 'ENG-9', url: 'https://linear.app/x/issue/ENG-9' } } } }];
+    if (body.query.includes('commentCreate')) return [200, { data: { commentCreate: { success: true, comment: { id: 'c_1', url: 'https://linear.app/x/issue/ENG-9#comment-c_1' } } } }];
+    return [200, { errors: [{ message: 'unknown' }] }];
+  });
+  const linear = new LinearClient({ apiKey: 'lin_api_x', apiUrl: await listen(lin.server), teamKey: 'ENG' });
+  const gh = fakeServer(() => [201, { id: 't9', html_url: 'https://github.com/x/y/tasks/t9' }]);
+  const agent = createCopilotBackend({ token: 't', repo: 'x/y', apiUrl: await listen(gh.server) });
+  const app = createApp({ db: openDb(':memory:'), linear, agent, autoDispatch: true });
+  const base = await listen(app.server);
+  const created = await json(await post(`${base}/api/bugs`, sample));
+  const comment = lin.calls.find((c) => c.body.query.includes('commentCreate'));
+  assert.equal(comment.body.variables.input.issueId, 'iss_1');
+  assert.match(comment.body.variables.input.body, /copilot.*https:\/\/github\.com\/x\/y\/tasks\/t9/);
+  const full = await json(await fetch(`${base}/api/bugs/${created.id}`));
+  assert.deepEqual(full.events.map((e) => e.type), ['received', 'linear.created', 'agent.dispatched', 'linear.commented']);
+  await app.close(); lin.server.close(); gh.server.close();
+});
+
 test('dispatch without a backend records agent.skipped', async () => {
   const app = createApp({ db: openDb(':memory:'), linear: null, agent: null });
   const base = await listen(app.server);

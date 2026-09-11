@@ -52,6 +52,20 @@ export function createPipeline({ db, linear, agent = null, autoDispatch = false,
     return db.getReport(reportId);
   }
 
+  // Close the loop on the Linear issue so whoever is watching it sees where the work went.
+  // Best-effort: a failed comment never fails the dispatch. Delegation already shows up in Linear itself.
+  async function noteDispatchOnIssue(report, backend, result) {
+    if (!linear || !report.linear_issue_id || backend === 'linear-delegate') return;
+    const body = `Handed to coding agent **${backend}**${result.url ? `: ${result.url}` : ''}\n\n_Posted by Requestor._`;
+    try {
+      const comment = await linear.createComment(report.linear_issue_id, body);
+      db.addEvent(report.id, 'linear.commented', { commentId: comment.id, url: comment.url });
+    } catch (err) {
+      db.addEvent(report.id, 'linear.comment_failed', { error: err.message });
+      console.error(`[requestor] Linear comment failed for ${report.id}: ${err.message}`);
+    }
+  }
+
   // Hand the report to a coding agent. Explicit (POST /api/bugs/:id/dispatch) unless AGENT_AUTO_DISPATCH=true.
   async function dispatchAgent(reportId) {
     const report = db.getReport(reportId);
@@ -65,6 +79,7 @@ export function createPipeline({ db, linear, agent = null, autoDispatch = false,
       const result = await agent.dispatch({ report, prompt });
       db.markAgentDispatched(reportId, agent.name, result);
       db.addEvent(reportId, 'agent.dispatched', { backend: agent.name, ref: result.ref, url: result.url, raw: result.raw ?? null });
+      await noteDispatchOnIssue(report, agent.name, result);
     } catch (err) {
       db.markAgentFailed(reportId, agent.name, err.message);
       db.addEvent(reportId, 'agent.failed', { backend: agent.name, error: err.message });
