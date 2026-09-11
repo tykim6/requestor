@@ -1,0 +1,14 @@
+{
+  "name": "requestor",
+  "version": "0.1.0",
+  "description": "Drop-in bug report widget that files informative Linear issues, with a SQLite audit log.",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=22.13" },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning src/server.js",
+    "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
+    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "linear:check": "node --no-warnings=ExperimentalWarning scripts/linear-check.js"
+  }
+}

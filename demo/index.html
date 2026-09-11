@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Acme Coffee Roasters</title>
+<style>
+  body{margin:0;font:16px/1.6 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#1f2937;background:#faf7f2}
+  header{background:#3b2a1e;color:#fff;padding:16px 32px;display:flex;justify-content:space-between;align-items:center}
+  header nav a{color:#e7d7c5;margin-left:20px;text-decoration:none}
+  main{max-width:900px;margin:0 auto;padding:40px 24px}
+  .hero{padding:48px 0;border-bottom:1px solid #e5e0d8}
+  h1{font-size:40px;margin:0 0 12px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px;margin:32px 0}
+  .card{background:#fff;border:1px solid #e5e0d8;border-radius:12px;padding:20px}
+  .card h3{margin:0 0 8px}.price{color:#92400e;font-weight:600}
+  button{font:inherit;padding:10px 16px;border-radius:8px;border:1px solid #3b2a1e;background:#3b2a1e;color:#fff;cursor:pointer}
+  button.secondary{background:#fff;color:#3b2a1e}
+  form{display:grid;gap:10px;max-width:400px}input{font:inherit;padding:8px 10px;border:1px solid #d1d5db;border-radius:8px}
+  .dev{margin-top:48px;padding:20px;border:1px dashed #b45309;border-radius:12px;background:#fffbeb}
+  .dev button{margin:4px 4px 4px 0}
+  footer{color:#6b7280;font-size:13px;text-align:center;padding:32px}
+</style>
+</head>
+<body>
+<header>
+  <strong>Acme Coffee Roasters</strong>
+  <nav><a href="#beans">Beans</a><a href="#subscribe">Subscribe</a><a href="#about">About</a></nav>
+</header>
+<main>
+  <section class="hero">
+    <h1>Small-batch beans, roasted weekly.</h1>
+    <p>Single-origin coffee delivered to your door. Try a bag, or subscribe and never run out.</p>
+    <button id="shop-now">Shop now</button>
+  </section>
+
+  <section id="beans">
+    <h2>This week's roasts</h2>
+    <div class="grid">
+      <div class="card"><h3>Ethiopia Yirgacheffe</h3><p>Floral, citrus, tea-like body.</p><p class="price">$18</p><button class="secondary add-to-cart" data-sku="eth-yirg">Add to cart</button></div>
+      <div class="card"><h3>Colombia Huila</h3><p>Caramel, red apple, balanced.</p><p class="price">$16</p><button class="secondary add-to-cart" data-sku="col-huila">Add to cart</button></div>
+      <div class="card"><h3>Sumatra Mandheling</h3><p>Earthy, dark chocolate, heavy body.</p><p class="price">$17</p><button class="secondary add-to-cart" data-sku="sum-mand">Add to cart</button></div>
+    </div>
+    <p>Cart: <span id="cart-count">0</span> items</p>
+  </section>
+
+  <section id="subscribe">
+    <h2>Subscribe</h2>
+    <form id="subscribe-form">
+      <input name="email" type="email" placeholder="you@example.com" required>
+      <input name="promo" placeholder="Promo code (optional)">
+      <button type="submit">Start subscription</button>
+    </form>
+    <p id="subscribe-status"></p>
+  </section>
+
+  <section id="about">
+    <h2>About</h2>
+    <p>Acme has roasted coffee in Portland since 2011. This page is a stand-in site for testing the Requestor bug widget in the bottom-right corner.</p>
+  </section>
+
+  <section class="dev">
+    <strong>Test harness</strong> — trigger things the widget should capture, then click the bug icon.
+    <div>
+      <button id="dev-throw" class="secondary">Throw an error</button>
+      <button id="dev-reject" class="secondary">Unhandled promise rejection</button>
+      <button id="dev-fetch404" class="secondary">Fetch a 404</button>
+      <button id="dev-fetchfail" class="secondary">Fetch a dead host</button>
+      <button id="dev-warn" class="secondary">console.warn</button>
+      <button id="dev-open" class="secondary">Requestor.open()</button>
+    </div>
+  </section>
+</main>
+<footer>© Acme Coffee Roasters · Requestor demo</footer>
+
+<!-- Drop-in widget. data-endpoint defaults to <script origin>/api/bugs, shown explicitly here. -->
+<script src="/requestor.js" data-endpoint="/api/bugs"></script>
+<script>
+  // Host app tells the widget who the user is and any app state worth attaching.
+  Requestor.identify({ id: 'u_1042', email: 'jane@example.com', name: 'Jane Doe' });
+  Requestor.setContext({ plan: 'pro', release: '2026.09.10', featureFlags: ['new-checkout'] });
+
+  var cart = 0;
+  document.querySelectorAll('.add-to-cart').forEach(function (b) {
+    b.addEventListener('click', function () {
+      cart++; document.getElementById('cart-count').textContent = cart;
+      Requestor.setContext({ cartItems: cart });
+      console.log('added to cart', b.dataset.sku);
+    });
+  });
+  document.getElementById('shop-now').addEventListener('click', function () { location.hash = 'beans'; });
+  document.getElementById('subscribe-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var promo = e.target.promo.value;
+    fetch('/api/subscribe', { method: 'POST', body: JSON.stringify({ email: e.target.email.value, promo: promo }) })
+      .then(function (r) { document.getElementById('subscribe-status').textContent = r.ok ? 'Subscribed!' : 'Subscription failed (' + r.status + ')'; });
+    if (promo === 'BREAK') { throw new Error('Promo engine crashed on code ' + promo); }
+  });
+
+  document.getElementById('dev-throw').onclick = function () { undefinedFunctionCall(); };
+  document.getElementById('dev-reject').onclick = function () { Promise.reject(new Error('Background sync failed')); };
+  document.getElementById('dev-fetch404').onclick = function () { fetch('/api/does-not-exist'); };
+  document.getElementById('dev-fetchfail').onclick = function () { fetch('http://localhost:1/dead').catch(function () {}); };
+  document.getElementById('dev-warn').onclick = function () { console.warn('Deprecated API used: legacyCheckout()'); };
+  document.getElementById('dev-open').onclick = function () { Requestor.open(); };
+</script>
+</body>
+</html>
