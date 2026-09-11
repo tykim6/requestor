@@ -81,13 +81,6 @@
   Requestor.setContext({ plan: 'pro', release: '2026.09.10', featureFlags: ['new-checkout'] });
 
   var cart = 0;
-  document.querySelectorAll('.add-to-cart').forEach(function (b) {
-    b.addEventListener('click', function () {
-      cart++; document.getElementById('cart-count').textContent = cart;
-      Requestor.setContext({ cartItems: cart });
-      console.log('added to cart', b.dataset.sku);
-    });
-  });
   // Delegated handler so cards added later also work.
   document.querySelector('.grid').addEventListener('click', function (e) {
     var b = e.target.closest('.add-to-cart');
