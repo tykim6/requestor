@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import http from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
 import { extname, join, normalize, resolve } from 'node:path';

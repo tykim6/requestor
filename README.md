@@ -1,5 +1,7 @@
 # Requestor
 
+[![test](https://github.com/tykim6/requestor/actions/workflows/test.yml/badge.svg)](https://github.com/tykim6/requestor/actions/workflows/test.yml)
+
 Bare-bones bug intake: a drop-in bug icon for any website that collects a description plus browser telemetry, logs everything to SQLite, and files an informative Linear issue.
 
 Zero npm dependencies. Requires Node 22.13+ (uses the built-in `node:sqlite`).
@@ -70,3 +72,11 @@ After the Linear issue exists, a report can be dispatched to a coding agent that
 Dispatch is manual by default (`POST /api/bugs/:id/dispatch`) so a public widget can't burn agent quota. Set `AGENT_AUTO_DISPATCH=true` to hand off every report right after it syncs. Outcomes land on the report (`agent_status`, `agent_url`) and in the events log (`agent.dispatched` / `agent.failed`).
 
 The prompt the agent receives is the Linear description plus a short job statement (see `buildAgentPrompt` in `src/format.js`). Adding a backend is one file in `src/agents/` plus a case in `src/agents/index.js`. A later stage can listen for the PR (Linear webhook or GitHub webhook) and append `agent.pr_opened`.
+
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) for the layout, how to add an agent backend, and what CI expects.
+
+## License
+
+[MIT](LICENSE)

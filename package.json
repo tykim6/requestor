@@ -2,9 +2,40 @@
   "name": "requestor",
   "version": "0.1.0",
   "description": "Drop-in bug report widget that files informative Linear issues, with a SQLite audit log.",
+  "license": "MIT",
+  "author": "Tyler Kim",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tykim6/requestor.git"
+  },
+  "homepage": "https://github.com/tykim6/requestor#readme",
+  "bugs": {
+    "url": "https://github.com/tykim6/requestor/issues"
+  },
+  "keywords": [
+    "bug-report",
+    "feedback-widget",
+    "linear",
+    "telemetry",
+    "coding-agent",
+    "copilot"
+  ],
   "type": "module",
-  "private": true,
-  "engines": { "node": ">=22.13" },
+  "main": "src/server.js",
+  "bin": {
+    "requestor": "src/server.js"
+  },
+  "files": [
+    "src",
+    "widget",
+    "scripts",
+    "demo",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node --no-warnings=ExperimentalWarning src/server.js",
     "dev": "node --no-warnings=ExperimentalWarning --watch src/server.js",
