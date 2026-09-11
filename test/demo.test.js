@@ -1,10 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
-
-const DEMO_HTML = fileURLToPath(new URL('../demo/index.html', import.meta.url));
 
 class Element {
   constructor({ id = '', className = '', dataset = {}, parent = null } = {}) {
@@ -39,7 +36,7 @@ class Element {
 }
 
 test('demo add-to-cart increments once per click', () => {
-  const html = readFileSync(DEMO_HTML, 'utf8');
+  const html = readFileSync('/home/runner/work/requestor/requestor/demo/index.html', 'utf8');
   const match = html.match(/<script>\s*([\s\S]*?)<\/script>\s*<\/body>/);
   assert.ok(match, 'expected inline demo script');
 
